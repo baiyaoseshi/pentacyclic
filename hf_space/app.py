@@ -40,11 +40,16 @@ class State:
 def ode(t: float, s: Tuple, p: Params) -> Tuple:
     g, e, m, f = s
     T0c = 1.0 / (1.0 + p.T0 * f)
-    dg = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max) * T0c - p.delta_forget * g
-    eregen = p.eta_ex * f
-    econs = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max)
-    de = eregen - econs - p.delta_entropy * m
-    dm = p.alpha * abs(dg) - p.delta_entropy * m
+    # C#-style dg
+    dg_learn_raw = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max) * (0.7 + 0.3 * p.alpha)
+    dg_learn = dg_learn_raw * T0c
+    dg_forget = p.delta_forget * g * max(0.0, 1.0 - 0.5 * min(1.0, g / p.g_max))
+    dg = dg_learn - dg_forget
+    # C#-style de: F4 simplified — logistic saturation, NOT coupled to f
+    de = p.eta_ex * max(0.0, 1.0 - e / p.e_max) - dg_learn
+    # F2: info gain
+    dm = p.alpha * dg_learn - p.delta_entropy * f * m
+    # F3: entropy
     df = p.sigma * abs(dm) - p.delta_f * f
     return (dg, de, dm, df)
 
@@ -83,31 +88,31 @@ def _lhs(bounds: dict, n: int, rng: random.Random) -> list:
         rng.shuffle(vals); pdim[pn] = vals
     return [{pn: pdim[pn][i] for pn in dims} for i in range(n)]
 
-def fit_gonly(g_obs: List[float], e0_val: float, n_iter=100, pop=16) -> Params:
-    """g-only 模式：只拟合 g，e 自由演化不参与代价函数"""
+def fit(g_obs: List[float], e_obs: List[float], n_iter=100, pop=16) -> Params:
+    """差分进化拟合（LHS 初始化 + 固定种子），同时拟合 g 和 e"""
     rng = random.Random(_LHS_SEED)
     base = Params()
-    g0v = max(g_obs[0], 1)
-    g_max_est = max(g_obs) * 1.5
-    e_max_est = max(e0_val * 2, g_max_est)
+    g0v = max(g_obs[0], 1); e0v = max(e_obs[0], 1)
+    gme = max(g_obs)*1.5; eme = max(e_obs)*1.5
     bounds = {
-        "g0": (g0v*0.5, g0v*5), "g_max": (g_max_est*0.5, g_max_est*3),
-        "e0": (e0_val*0.5, e0_val*3), "e_max": (e_max_est*0.5, e_max_est*3),
-        "epsilon0": (0.01, 2), "alpha": (0.05, 2),
-        "delta_forget": (0.001, 0.3), "T0": (0.02, 0.8),
+        "g0": (g0v*0.5, g0v*5), "e0": (e0v*0.5, e0v*3),
+        "g_max": (gme*0.5, gme*3), "e_max": (eme*0.5, eme*3),
+        "epsilon0": (0.01, 2), "alpha": (0.05, 2), "eta_ex": (0.05, 1.5),
+        "delta_forget": (0.001, 0.3), "delta_f": (0.005, 0.5),
+        "delta_entropy": (0.001, 0.2), "T0": (0.02, 0.8),
     }
-    base = base.with_overrides(g0=g0v, g_max=g_max_est, e0=e0_val, e_max=e_max_est)
+    base = base.with_overrides(g0=g0v, e0=e0v, g_max=gme, e_max=eme)
     ns = len(g_obs)
-
     def cost(p: Params) -> float:
         try:
             p2 = p.with_overrides(t_end=ns*0.5, dt=0.5)
             tr = solve_ode(p2, t_end=p2.t_end, dt=p2.dt)
             if len(tr) < ns: return 1e9
-            gp = [s.g for s in tr[:ns]]
-            return math.sqrt(sum((a-b)**2 for a,b in zip(g_obs,gp))/ns) / (max(g_obs) or 1)
+            gp = [s.g for s in tr[:ns]]; ep = [s.e for s in tr[:ns]]
+            g_rmse = math.sqrt(sum((a-b)**2 for a,b in zip(g_obs,gp))/ns)
+            e_rmse = math.sqrt(sum((a-b)**2 for a,b in zip(e_obs,ep))/ns)
+            return g_rmse/(max(g_obs) or 1) + 0.3*e_rmse/(max(e_obs) or 1)
         except: return 1e9
-
     lhs_s = _lhs(bounds, pop-1, rng)
     population = [base] + [base.with_overrides(**o) for o in lhs_s]
     best_p = base; best_c = cost(base); noimp = 0
@@ -221,30 +226,30 @@ if uploaded:
             else:
                 e_obs = (e_raw / e_raw.max() * e_max).tolist()
 
-            best = fit_gonly(g_obs, e0_val=e_obs[0], n_iter=100, pop=16)
+            best = fit(g_obs, e_obs, n_iter=100, pop=16)
             traj = solve_ode(best.with_overrides(t_end=len(g_obs)*0.5, dt=0.5),
                             t_end=len(g_obs)*0.5, dt=0.5)
             c3s = c3_margin(traj, best)
 
-        st.subheader("Fitted Parameters (g-only mode)")
+        st.subheader("Fitted Parameters")
         c1, c2, c3 = st.columns(3)
         with c1: st.metric("epsilon0 (learning efficiency)", f"{best.epsilon0:.4f}")
         with c2: st.metric("alpha (info conversion)", f"{best.alpha:.4f}")
-        with c3: st.metric("delta_forget (forgetting rate)", f"{best.delta_forget:.4f}")
+        with c3: st.metric("eta_ex (recovery efficiency)", f"{best.eta_ex:.4f}")
 
         # ── g/e 对比图 ──
-        st.subheader("g (stored energy): observed vs fitted")
+        st.subheader("g / e: observed vs fitted")
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
         n = len(g_obs)
         ax1.plot(range(n), g_obs, "o", ms=3, alpha=0.6, label="observed", color="#1f77b4")
         ax1.plot(range(n), [s.g for s in traj[:n]], "-", lw=2, label="fitted", color="#ff7f0e")
         ax1.set_xlabel("Epoch"); ax1.set_ylabel("g"); ax1.legend(); ax1.grid(True, alpha=0.3)
-        ax1.set_title("g fitting")
+        ax1.set_title("g")
 
-        ax2.plot(range(n), e_obs, "o", ms=3, alpha=0.6, label="observed (reference)", color="#1f77b4")
-        ax2.plot(range(n), [s.e for s in traj[:n]], "-", lw=2, label="ODE (not fitted)", color="#999999", ls="--")
+        ax2.plot(range(n), e_obs, "o", ms=3, alpha=0.6, label="observed", color="#1f77b4")
+        ax2.plot(range(n), [s.e for s in traj[:n]], "-", lw=2, label="fitted", color="#2ca02c")
         ax2.set_xlabel("Epoch"); ax2.set_ylabel("e"); ax2.legend(); ax2.grid(True, alpha=0.3)
-        ax2.set_title("e (reference only, not used in fitting)")
+        ax2.set_title("e")
         plt.tight_layout(); st.pyplot(fig)
 
         # ── C3 裕度 ──
