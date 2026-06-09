@@ -4,6 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-FF4B4B)](https://streamlit.io/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20533606.svg)](https://doi.org/10.5281/zenodo.20533606)
+[![HuggingFace](https://img.shields.io/badge/🤗%20HuggingFace-Try%20Online-FF9D00)](https://huggingface.co/spaces/YOUR_USERNAME/pentacyclic)  <!-- 创建 Space 后替换 YOUR_USERNAME -->
 
 **A unified thermodynamic-information framework for low-entropy non-equilibrium dissipative structures, with an ML training diagnosis demo.**
 **低熵非平衡耗散系统的热力学-信息论统一框架，含 ML 训练诊断 Demo。**
