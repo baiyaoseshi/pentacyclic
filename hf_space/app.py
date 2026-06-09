@@ -97,7 +97,7 @@ def fit(g_obs: List[float], e_obs: List[float], n_iter=100, pop=16) -> Params:
     bounds = {
         "g0": (g0v*0.5, g0v*5), "e0": (e0v*0.5, e0v*3),
         "g_max": (gme*0.5, gme*3), "e_max": (eme*0.5, eme*3),
-        "epsilon0": (0.01, 2), "alpha": (0.05, 2), "eta_ex": (0.05, 1.5),
+        "epsilon0": (0.01, 2), "alpha": (0.05, 2), "eta_ex": (1.0, 100.0),
         "delta_forget": (0.001, 0.3), "delta_f": (0.005, 0.5),
         "delta_entropy": (0.001, 0.2), "T0": (0.02, 0.8),
     }
@@ -215,16 +215,15 @@ if uploaded:
             e_is_loss = en and "loss" in en.lower()
 
             if g_is_loss:
-                # loss 下降 → g 上升
                 g_obs = ((1 - g_raw / g_raw.iloc[0]) * g_max).tolist()
             else:
-                g_obs = (g_raw / g_raw.max() * g_max).tolist()
+                # accuracy: 直接乘 g_max，不除以 max（保留真实饱和余量）
+                g_obs = (g_raw * g_max).tolist()
 
             if e_is_loss:
-                # val_loss 初始值高 → e 可用学习空间大，下降 → e 减小
                 e_obs = (e_raw / e_raw.iloc[0] * e_max).tolist()
             else:
-                e_obs = (e_raw / e_raw.max() * e_max).tolist()
+                e_obs = (e_raw * e_max).tolist()
 
             best = fit(g_obs, e_obs, n_iter=100, pop=16)
             traj = solve_ode(best.with_overrides(t_end=len(g_obs)*0.5, dt=0.5),
