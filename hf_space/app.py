@@ -76,7 +76,7 @@ def c3_margin(states: List[State], p: Params) -> List[float]:
         dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) / (1 + 0.5 * s.f)
         forget_flux = p.delta_forget * s.g * max(0, 1 - 0.5 * min(1, s.g/p.g_max))
         gradient = dg_learn + forget_flux
-        burden = 0.5 * max(0, s.f - forget_flux)
+        burden = 0.1 * max(0, s.f - forget_flux)  # align with C# Temperature=0.1
         c3s.append(gradient - burden)
     return c3s
 
