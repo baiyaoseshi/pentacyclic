@@ -120,7 +120,7 @@ with st.expander("📋 诊断能力与适用范围（请先阅读）"):
 
 ### 社区版限制
 - 仅显示 2 项核心拟合参数（Epsilon0, Alpha）
-- 前 3 条诊断建议
+- 前 1 条诊断建议
 - 无多实验对比、前向预测、实时监控功能
 - 升级 **专业版** 解锁全部功能：[联系我们](mailto:937692907@qq.com)
 
@@ -532,11 +532,11 @@ if uploaded_file is not None:
                 fig2.tight_layout()
                 st.pyplot(fig2)
 
-            # ── 建议（仅前 3 条）──
+            # ── 建议（社区版：仅第 1 条）──
             st.subheader("💡 诊断建议")
             suggestions = extract_suggestions(safe_name)
             if suggestions:
-                for s in suggestions[:3]:
+                for s in suggestions[:1]:
                     st.markdown(f"- {s}")
             else:
                 st.info("✅ 当前训练配置未触发预设优化阈值，系统运行良好。")

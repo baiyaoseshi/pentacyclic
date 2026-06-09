@@ -82,7 +82,7 @@ This project implements the **Pentacyclic Dissipative Systems (PDS)** framework 
 - ✅ 拟合优度 R²
 - ✅ g/e 观测 vs 拟合对比图
 - ✅ g-only 模式检测与警告
-- ✅ 前 3 条诊断建议
+- ✅ 前 1 条诊断建议
 
 ### 专业版（Professional） — [联系我们](mailto:937692907@qq.com)
 
