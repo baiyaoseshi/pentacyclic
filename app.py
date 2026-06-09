@@ -479,7 +479,7 @@ if uploaded_file is not None:
                 if e_name and "loss" in e_name.lower():
                     e_obs = e_raw / e_raw.iloc[0] * e_max
                 else:
-                    e_obs = e_raw * e_max
+                    e_obs = (1 - e_raw) * e_max
                 ax2.plot(
                     range(len(e_obs)), e_obs.values,
                     "o", markersize=3, alpha=0.6, label="观测值", color="#1f77b4",

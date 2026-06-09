@@ -40,8 +40,8 @@ class State:
 def ode(t: float, s: Tuple, p: Params) -> Tuple:
     g, e, m, f = s
     T0c = 1.0 / (1.0 + 0.5 * f)  # C2: hardcoded 0.5 (match C# backend)
-    # C#-style dg
-    dg_learn_raw = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max) * (0.7 + 0.3 * p.alpha)
+    # dg (F5): alphaBoost 已移除——α 仅出现在 F2 dm，不应耦合到 dg
+    dg_learn_raw = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max)
     dg_learn = dg_learn_raw * T0c
     dg_forget = p.delta_forget * g * max(0.0, 1.0 - 0.5 * min(1.0, g / p.g_max))
     dg = dg_learn - dg_forget
@@ -73,7 +73,7 @@ def c3_margin(states: List[State], p: Params) -> List[float]:
     """C#-style C3: dg_learn + forgetFlux 为梯度信号, 0.5*max(0,f-forgetFlux) 为熵负担"""
     c3s = []
     for s in states:
-        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) * (0.7 + 0.3 * p.alpha) / (1 + 0.5 * s.f)
+        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) / (1 + 0.5 * s.f)
         forget_flux = p.delta_forget * s.g * max(0, 1 - 0.5 * min(1, s.g/p.g_max))
         gradient = dg_learn + forget_flux
         burden = 0.5 * max(0, s.f - forget_flux)
@@ -227,7 +227,7 @@ if uploaded:
             if e_is_loss:
                 e_obs = (e_raw / e_raw.iloc[0] * e_max).tolist()
             else:
-                e_obs = (e_raw * e_max).tolist()
+                e_obs = ((1 - e_raw) * e_max).tolist()
 
             best = fit(g_obs, e_obs, n_iter=100, pop=16)
             traj = solve_ode(best.with_overrides(t_end=len(g_obs)*0.5, dt=0.5),
