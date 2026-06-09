@@ -113,7 +113,7 @@ with st.expander("📋 诊断能力与适用范围（请先阅读）"):
 | 情况 | 表现 | 原因 |
 |------|------|------|
 | 观测点 < 20 epoch | R² 偏低或为负 | 信息不足，无法稳定拟合 6 个自由参数 |
-| g/e 高度共线（相关系数 > 0.99） | 自动切换 g-only 模式 | 可用能曲线与知识结构曲线几乎同步 |
+| g/e 高度共线（相关系数 > 0.99） | 自动切换 g-only 模式 | 可用能曲线与储存能量曲线几乎同步 |
 | g_max / e_max 设置不当 | C3 裕度被高估或低估 | 归一化参考系错误，需调整高级选项 |
 | 非 epoch 级日志（如 batch 级） | 拟合失败或参数异常 | 数据密度与 ODE 积分步长不匹配 |
 | 非监督学习任务 | 模型不适用 | 理论当前仅覆盖监督学习的能量-信息耦合框架 |
@@ -319,7 +319,7 @@ if uploaded_file is not None:
 
     if all_auto:
         with col1:
-            st.success(f"✅ g 列（知识结构）自动匹配: **{g_name}**（第 {g_idx + 1} 列）")
+            st.success(f"✅ g 列（储存能量）自动匹配: **{g_name}**（第 {g_idx + 1} 列）")
         with col2:
             st.success(f"✅ e 列（可用学习空间）自动匹配: **{e_name}**（第 {e_idx + 1} 列）")
     else:
@@ -327,7 +327,7 @@ if uploaded_file is not None:
         col3, col4 = st.columns(2)
         with col3:
             g_sel = st.selectbox(
-                "g 列（知识结构，如 train_acc）",
+                "g 列（储存能量，如 train_acc）",
                 headers,
                 index=g_idx if g_idx is not None else 0,
             )
@@ -353,7 +353,7 @@ if uploaded_file is not None:
             g_max = st.number_input(
                 "g_max — 存储容量上限",
                 value=100.0, min_value=1.0, max_value=100000.0,
-                help="模型架构理论上能学到的知识上限。由参数量、架构容量、任务复杂度决定。"
+                help="模型结构理论上能承载的信息上限。由参数量、架构容量、任务复杂度决定。"
                      "设太高会低估增长，设太低会误判饱和。"
                      "建议：小型任务 50–200，中型任务 200–2000，大模型 10³–10⁶。"
             )
@@ -407,7 +407,7 @@ if uploaded_file is not None:
             # ── g-only 模式警告 ──
             if g_only:
                 st.warning(
-                    "⚠️ **仅拟合了 g（知识结构），e（可用学习空间）未参与拟合。**\n\n"
+                    "⚠️ **仅拟合了 g（储存能量），e（可用学习空间）未参与拟合。**\n\n"
                     "原因：e 观测值变化太小（<20%）或与 g 高度共线，无法提供独立约束。"
                     "下方的 e-R² 为占位值，e 拟合曲线不代表真实观测。",
                 )
@@ -446,7 +446,7 @@ if uploaded_file is not None:
             fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
             # g 对比
-            ax1.set_title("g（知识结构）: 观测 vs 拟合", fontsize=13)
+            ax1.set_title("g（储存能量）: 观测 vs 拟合", fontsize=13)
             if g_idx is not None:
                 g_raw = pd.to_numeric(df_orig.iloc[:, g_idx], errors="coerce")
                 if g_name and "loss" in g_name.lower():
@@ -457,9 +457,9 @@ if uploaded_file is not None:
                     range(len(g_obs)), g_obs.values,
                     "o", markersize=3, alpha=0.6, label="观测值", color="#1f77b4",
                 )
-            if fitted_df is not None and "g(知识结构)" in fitted_df.columns:
+            if fitted_df is not None and "g(结构能量)" in fitted_df.columns:
                 ax1.plot(
-                    fitted_df["时间"], fitted_df["g(知识结构)"],
+                    fitted_df["时间"], fitted_df["g(结构能量)"],
                     "-", linewidth=2, label="拟合值", color="#ff7f0e",
                 )
                 ax1.set_xlabel("时间")
