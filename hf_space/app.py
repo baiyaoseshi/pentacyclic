@@ -72,7 +72,7 @@ def solve_ode(p: Params, t_end=None, dt=None) -> List[State]:
 def c3_margin(states: List[State], p: Params) -> List[float]:
     c3s = []
     for s in states:
-        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) / (1 + p.T0 * s.f)
+        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) * (0.7 + 0.3 * p.alpha) / (1 + p.T0 * s.f)
         c3s.append(dg_learn - p.T0 * s.f - p.delta_forget * s.g)
     return c3s
 
