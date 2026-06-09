@@ -39,7 +39,7 @@ class State:
 
 def ode(t: float, s: Tuple, p: Params) -> Tuple:
     g, e, m, f = s
-    T0c = 1.0 / (1.0 + p.T0 * f)
+    T0c = 1.0 / (1.0 + 0.5 * f)  # C2: hardcoded 0.5 (match C# backend)
     # C#-style dg
     dg_learn_raw = p.epsilon0 * e * max(0.0, 1.0 - g / p.g_max) * (0.7 + 0.3 * p.alpha)
     dg_learn = dg_learn_raw * T0c
@@ -70,10 +70,14 @@ def solve_ode(p: Params, t_end=None, dt=None) -> List[State]:
     return states
 
 def c3_margin(states: List[State], p: Params) -> List[float]:
+    """C#-style C3: dg_learn + forgetFlux 为梯度信号, 0.5*max(0,f-forgetFlux) 为熵负担"""
     c3s = []
     for s in states:
-        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) * (0.7 + 0.3 * p.alpha) / (1 + p.T0 * s.f)
-        c3s.append(dg_learn - p.T0 * s.f - p.delta_forget * s.g)
+        dg_learn = p.epsilon0 * s.e * max(0, 1 - s.g/p.g_max) * (0.7 + 0.3 * p.alpha) / (1 + 0.5 * s.f)
+        forget_flux = p.delta_forget * s.g * max(0, 1 - 0.5 * min(1, s.g/p.g_max))
+        gradient = dg_learn + forget_flux
+        burden = 0.5 * max(0, s.f - forget_flux)
+        c3s.append(gradient - burden)
     return c3s
 
 # ── LHS + DE Fitter ──
@@ -99,7 +103,7 @@ def fit(g_obs: List[float], e_obs: List[float], n_iter=100, pop=16) -> Params:
         "g_max": (gme*0.5, gme*3), "e_max": (eme*0.5, eme*3),
         "epsilon0": (0.01, 2), "alpha": (0.05, 2), "eta_ex": (1.0, 100.0),
         "delta_forget": (0.001, 0.3), "delta_f": (0.005, 0.5),
-        "delta_entropy": (0.001, 0.2), "T0": (0.02, 0.8),
+        "delta_entropy": (0.001, 0.2),
     }
     base = base.with_overrides(g0=g0v, e0=e0v, g_max=gme, e_max=eme)
     ns = len(g_obs)
@@ -111,7 +115,7 @@ def fit(g_obs: List[float], e_obs: List[float], n_iter=100, pop=16) -> Params:
             gp = [s.g for s in tr[:ns]]; ep = [s.e for s in tr[:ns]]
             g_rmse = math.sqrt(sum((a-b)**2 for a,b in zip(g_obs,gp))/ns)
             e_rmse = math.sqrt(sum((a-b)**2 for a,b in zip(e_obs,ep))/ns)
-            return g_rmse/(max(g_obs) or 1) + 0.3*e_rmse/(max(e_obs) or 1)
+            return g_rmse/(max(g_obs) or 1) + e_rmse/(max(e_obs) or 1)
         except: return 1e9
     lhs_s = _lhs(bounds, pop-1, rng)
     population = [base] + [base.with_overrides(**o) for o in lhs_s]
