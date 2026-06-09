@@ -83,18 +83,20 @@ def _lhs(bounds: dict, n: int, rng: random.Random) -> list:
         rng.shuffle(vals); pdim[pn] = vals
     return [{pn: pdim[pn][i] for pn in dims} for i in range(n)]
 
-def fit_gonly(g_obs: List[float], n_iter=80, pop=12) -> Params:
+def fit_gonly(g_obs: List[float], e0_val: float, n_iter=100, pop=16) -> Params:
     """g-only 模式：只拟合 g，e 自由演化不参与代价函数"""
     rng = random.Random(_LHS_SEED)
     base = Params()
     g0v = max(g_obs[0], 1)
     g_max_est = max(g_obs) * 1.5
+    e_max_est = max(e0_val * 2, g_max_est)
     bounds = {
         "g0": (g0v*0.5, g0v*5), "g_max": (g_max_est*0.5, g_max_est*3),
+        "e0": (e0_val*0.5, e0_val*3), "e_max": (e_max_est*0.5, e_max_est*3),
         "epsilon0": (0.01, 2), "alpha": (0.05, 2),
         "delta_forget": (0.001, 0.3), "T0": (0.02, 0.8),
     }
-    base = base.with_overrides(g0=g0v, g_max=g_max_est, e0=g0v*0.8)
+    base = base.with_overrides(g0=g0v, g_max=g_max_est, e0=e0_val, e_max=e_max_est)
     ns = len(g_obs)
 
     def cost(p: Params) -> float:
@@ -219,7 +221,7 @@ if uploaded:
             else:
                 e_obs = (e_raw / e_raw.max() * e_max).tolist()
 
-            best = fit_gonly(g_obs, n_iter=80, pop=12)
+            best = fit_gonly(g_obs, e0_val=e_obs[0], n_iter=100, pop=16)
             traj = solve_ode(best.with_overrides(t_end=len(g_obs)*0.5, dt=0.5),
                             t_end=len(g_obs)*0.5, dt=0.5)
             c3s = c3_margin(traj, best)
